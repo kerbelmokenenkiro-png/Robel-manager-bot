@@ -44,7 +44,7 @@ def main():
     server_thread.start()
 
     # Telegram Bot
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")  # ወይም የራስህን ቶከን እዚህ ተጠቀም
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8693907353:AAFSnUHjcZtNXKiR6FBOWwg1oc41LildIdI")  # ወይም የራስህን ቶከን እዚህ ተጠቀም
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
