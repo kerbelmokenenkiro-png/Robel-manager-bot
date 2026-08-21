@@ -1,5 +1,6 @@
 import os
 import random
+import requests
 from threading import Thread
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -16,10 +17,31 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
-# 2. የውሂብ መዝገብ (In-Memory Database for Scores)
+# 2. Gemini API Function 🧠
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6J3Vu0jJpdnROajKZZE5o13wQo1SPekfkV2lfmHAb_j7Q")
+
+def get_gemini_response(user_text):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{
+            "parts": [{"text": user_text}]
+        }]
+    }
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return "ይቅርታ፣ ከ AI መልስ ሲቀበል ስህተት ተፈጥሯል።"
+    except Exception as e:
+        return f"ስህተት፡ {e}"
+
+# 3. የውሂብ መዝገብ (In-Memory Database for Scores)
 user_scores = {}
 
-# 3. የጥያቄዎች ስብስብ (Quiz Database)
+# 4. የጥያቄዎች ስብስብ (Quiz Database)
 QUIZ_DATA = [
     {
         "question": "የኮምፒውተር አእምሮ (Brain) በመባል የሚታወቀው የትኛው ክፍል ነው? 🧠",
@@ -63,7 +85,7 @@ QUIZ_DATA = [
     }
 ]
 
-# 4. የቴክኖሎጂ እውነታዎች (Tech Facts)
+# 5. የቴክኖሎጂ እውነታዎች (Tech Facts)
 TECH_FACTS = [
     "💡 የመጀመሪያው 1GB Hard Drive በ 1980 የወጣ ሲሆን ሚዛኑ ከ 250 ኪሎግራም በላይ ነበር!",
     "💡 በየቀኑ ከ 500 ሚሊዮን በላይ ቴ tweet በ Twitter (X) ላይ ይላካሉ።",
@@ -72,7 +94,7 @@ TECH_FACTS = [
     "💡 ሮቦት (Robot) የሚለው ቃል የመጣው 'Robota' ከሚለው የቼክ ቃል ሲሆን ትርጉሙም 'የግዳጅ ስራ' ማለት ነው።"
 ]
 
-# 5. ዋና ዋና ተግባራት (Bot Handlers)
+# 6. ዋና ዋና ተግባራት (Bot Handlers)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
@@ -93,7 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         f"ሰላም {user_name}! 👋\n"
         f"እንኳን ወደ **Robel Manager Bot** በደህና መጡ! 🤖\n\n"
-        f"ከታች ያሉትን ቁልፎች በመጫን የሚፈልጉትን አገልግሎት መምረጥ ይችላሉ፦"
+        f"ከታች ያሉትን ቁልፎች በመጫን ወይም በቀጥታ ማናቸውንም ጥያቄዎች በጽሁፍ በመጠየቅ የ Gemini AI ምላሽ ማግኘት ይችላሉ! ✨"
     )
     if update.message:
         await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -104,7 +126,7 @@ async def send_quiz(query_or_message):
     q_data = random.choice(QUIZ_DATA)
     keyboard = [[opt] for opt in q_data["options"]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if hasattr(query_or_message, 'edit_message_text'):
         await query_or_message.edit_message_text(q_data["question"], reply_markup=reply_markup)
     else:
@@ -116,7 +138,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     user_name = query.from_user.first_name
 
-    # የጥያቄዎች ምላሽ
     if query.data == 'quiz_correct':
         user_scores[user_id] = user_scores.get(user_id, 0) + 10
         keyboard = [
@@ -136,11 +157,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ተሳስተሃል! ❌ እንደገና ሞክር።\nአሁናዊ ነጥብህ፦ {user_scores.get(user_id, 0)}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
-    # የቁልፎች ምላሽ (Menu Buttons)
+
     elif query.data == 'btn_quiz':
         await send_quiz(query)
-        
+
     elif query.data == 'btn_score':
         score = user_scores.get(user_id, 0)
         keyboard = [[InlineKeyboardButton("🏠 ወደ ዋናው ገጽ", callback_data='btn_main_menu')]]
@@ -149,7 +169,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='Markdown'
         )
-        
+
     elif query.data == 'btn_fact':
         fact = random.choice(TECH_FACTS)
         keyboard = [
@@ -171,7 +191,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🏠 ወደ ዋናው ገጽ", callback_data='btn_main_menu')]]
         about_text = (
             "🤖 **ስለ Robel Manager Bot**\n\n"
-            "ይህ ቦት በ Python የተሰራ ሲሆን ለጨዋታዎች፣ ለሂሳብ ስሌቶች እና ለተለያዩ መረጃዎች አገልግሎት ይሰጣል።\n\n"
+            "ይህ ቦት በ Python የተሰራ ሲሆን ለጨዋታዎች፣ ለሂሳብ ስሌቶች፣ ለተለያዩ መረጃዎች እና በ Gemini AI የታገዘ ውይይት አገልግሎት ይሰጣል።\n\n"
             "👨‍💻 አዘጋጅ፦ ሮቤል"
         )
         await query.edit_message_text(about_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
@@ -196,45 +216,49 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-# 6. የካልኩሌተር Command (Command Handler)
+# 7. የጽሁፍ መልእክት በ Gemini AI መመለሻ (AI Handler) 🤖
+async def handle_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    ai_response = get_gemini_response(user_text)
+    await update.message.reply_text(ai_response)
+
+# 8. የካልኩሌተር Command (Command Handler)
 async def calculate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("እባክዎን ከትእዛዙ በኋላ ስሌቱን ይጻፉ! ምሳሌ፦ `/calc 12 + 5`", parse_mode='Markdown')
         return
-    
+
     expression = "".join(context.args)
     try:
-        # ለደህንነት ሲባል የተወሰኑ ምልክቶችን ብቻ መፍቀድ
         allowed_chars = "0123456789+-*/.()"
         if any(char not in allowed_chars for char in expression):
             await update.message.reply_text("❌ እባክዎን ትክክለኛ የሂሳብ ምልክቶችን ብቻ ይጠቀሙ (+, -, *, /)")
             return
-            
+
         result = eval(expression)
         await update.message.reply_text(f"🧮 **ውጤት፦** `{expression} = {result}`", parse_mode='Markdown')
     except Exception:
         await update.message.reply_text("❌ የጻፉት ስሌት ስህተት አለበት። እባክዎን አስተካክለው ይሞክሩ።")
 
-# 7. ዋናው ማስነሻ አፕሊኬሽን (Main Application)
+# 9. ዋናው ማስነሻ አፕሊኬሽን (Main Application)
 def main():
-    # Flask ሰርቨርን በጀርባ ማስነሳት
     server_thread = Thread(target=run_flask)
     server_thread.daemon = True
     server_thread.start()
 
-    # Telegram Bot Token setup
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "8693907353:AAFSnUHjcZtNXKiR6FBOWwg1oc41LildIdI")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Handlers ማገናኘት
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("quiz", lambda u, c: send_quiz(u.message)))
     app.add_handler(CommandHandler("calc", calculate))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    
+    # የጽሁፍ መልእክቶችን ወደ Gemini AI የመላኪያ Handler
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_ai_chat))
 
-    print("Robel Manager Bot Version 2.0 is running...")
+    print("Robel Manager Bot Version 2.0 with Gemini AI is running...")
     app.run_polling()
 
 if __name__ == '__main__':
     main()
-
