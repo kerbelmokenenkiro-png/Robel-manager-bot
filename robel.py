@@ -17,10 +17,13 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
-# 2. Gemini API Function 🧠
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6J3Vu0jJpdnROajKZZE5o13wQo1SPekfkV2lfmHAb_j7Q")
+# 2. Gemini API Function 🧠 (ቁልፉ በ Render Environment Variable በኩል ይነበባል)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 def get_gemini_response(user_text):
+    if not GEMINI_API_KEY:
+        return "ስህተት፡ የ Gemini API Key አልተዘጋጀም። እባክዎን በ Render Environment Variables ውስጥ GEMINI_API_KEY ጨምሩ።"
+        
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     data = {
